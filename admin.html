@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CBC Admin — Onderzoeker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#F5F3EE;--surface:#fff;--border:#E2DDD6;--border-strong:#C8C2B8;
+  --text:#1A1814;--text-2:#6B6560;--text-3:#9E9890;
+  --accent:#2D5F4F;--accent-light:#EAF2EE;--accent-mid:#4A8B74;
+  --warn:#8B4513;--warn-light:#FDF3EC;
+  --danger:#C0392B;--danger-light:#FDEDEC;
+  --r:10px;--r-lg:16px;--shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.6;min-height:100vh}
+.shell{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+.sidebar{background:var(--text);color:#fff;padding:1.75rem 1.25rem;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{font-family:'DM Serif Display',serif;font-size:19px;color:#fff;margin-bottom:.2rem}
+.logo-sub{font-size:11px;color:#6B6560;letter-spacing:.08em;text-transform:uppercase;margin-bottom:1.75rem}
+.nav-item{display:flex;align-items:center;gap:9px;padding:.55rem .7rem;border-radius:8px;cursor:pointer;margin-bottom:2px;font-size:13px;color:#C8C2B8;transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,.07);color:#fff}
+.nav-item.active{background:rgba(255,255,255,.12);color:#fff;font-weight:500}
+.nav-item .num{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex-shrink:0}
+.nav-item.active .num,.nav-item.done .num{background:var(--accent);color:#fff}
+.nav-sep{height:1px;background:rgba(255,255,255,.08);margin:.875rem 0}
+.sidebar-stat{font-size:12px;color:#6B6560;margin-bottom:.5rem}
+.sidebar-stat strong{color:#9E9890;display:block;font-size:11px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:.15rem}
+.sidebar-footer{margin-top:auto;font-size:11px;color:#4a4540;padding-top:1rem}
+.main{padding:2.25rem 1.75rem;max-width:860px}
+.page-header{margin-bottom:1.75rem}
+.page-header h1{font-family:'DM Serif Display',serif;font-size:26px;font-weight:400;margin-bottom:.2rem}
+.page-header p{color:var(--text-2);font-size:14px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.375rem;margin-bottom:1.125rem;box-shadow:var(--shadow)}
+.card-title{font-size:12px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-bottom:1rem}
+label{display:block;font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:.3rem}
+input[type=text],input[type=number],input[type=password],textarea,select{width:100%;padding:.575rem .8rem;border:1px solid var(--border);border-radius:var(--r);font-family:inherit;font-size:14px;color:var(--text);background:var(--surface);transition:border-color .15s;outline:none}
+input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,95,79,.1)}
+.field{margin-bottom:.875rem}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:.575rem 1.125rem;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);font-family:inherit;font-size:14px;font-weight:500;color:var(--text);cursor:pointer;transition:all .15s;white-space:nowrap}
+.btn:hover{background:var(--bg)}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:#245040}
+.btn-sm{padding:.375rem .8rem;font-size:13px}
+.btn-danger{color:var(--danger);border-color:currentColor}
+.btn-danger:hover{background:var(--danger-light)}
+.btn-row{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:1.125rem}
+.attr-block{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:.875rem;margin-bottom:.75rem}
+.attr-header{display:flex;align-items:center;gap:.75rem;margin-bottom:.75rem}
+.attr-name-input{flex:1;padding:.475rem .7rem;border:1px solid var(--border);border-radius:8px;font-size:14px;font-weight:500;font-family:inherit;background:var(--surface);color:var(--text);outline:none}
+.attr-name-input:focus{border-color:var(--accent)}
+.levels-row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+.level-chip{display:flex;align-items:center;gap:4px;padding:.3rem .65rem;background:var(--surface);border:1px solid var(--border);border-radius:20px;font-size:13px}
+.level-input{border:none;outline:none;font-family:inherit;font-size:13px;color:var(--text);background:transparent;min-width:60px;max-width:160px}
+.level-del{background:none;border:none;cursor:pointer;color:var(--text-3);font-size:14px;line-height:1;padding:0 2px}
+.level-del:hover{color:var(--danger)}
+.add-level-btn{font-size:12px;color:var(--accent);background:none;border:1px dashed var(--accent-mid);border-radius:20px;padding:.275rem .7rem;cursor:pointer;font-family:inherit}
+.add-level-btn:hover{background:var(--accent-light)}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px}
+.badge-green{background:var(--accent-light);color:var(--accent)}
+.badge-gray{background:var(--bg);color:var(--text-2);border:1px solid var(--border)}
+.badge-warn{background:var(--warn-light);color:var(--warn)}
+.info-box{background:var(--accent-light);border:1px solid rgba(45,95,79,.2);border-radius:var(--r);padding:.8rem 1rem;font-size:13px;color:var(--accent);margin-bottom:.875rem}
+.warn-box{background:var(--warn-light);border:1px solid rgba(139,69,19,.2);border-radius:var(--r);padding:.8rem 1rem;font-size:13px;color:var(--warn);margin-bottom:.875rem}
+.err-box{background:var(--danger-light);border:1px solid rgba(192,57,43,.2);border-radius:var(--r);padding:.8rem 1rem;font-size:13px;color:var(--danger);margin-bottom:.875rem}
+.matrix-table{width:100%;border-collapse:collapse;font-size:13px}
+.matrix-table th{background:var(--bg);padding:.45rem .7rem;text-align:left;font-weight:500;color:var(--text-2);border:1px solid var(--border);font-size:12px}
+.matrix-table td{padding:.45rem .7rem;border:1px solid var(--border);vertical-align:middle}
+.matrix-table tr:nth-child(even) td{background:rgba(0,0,0,.015)}
+.set-num{font-weight:600;color:var(--accent);font-size:12px}
+.section{display:none}
+.section.active{display:block}
+/* Responses table */
+.resp-table{width:100%;border-collapse:collapse;font-size:13px}
+.resp-table th{background:var(--bg);padding:.5rem .75rem;text-align:left;font-weight:500;color:var(--text-2);border-bottom:1px solid var(--border);font-size:12px;letter-spacing:.03em}
+.resp-table td{padding:.5rem .75rem;border-bottom:1px solid var(--border);vertical-align:middle}
+.resp-table tr:hover td{background:var(--bg)}
+.resp-avatar{width:28px;height:28px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.875rem;margin-bottom:1.125rem}
+.stat-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:.875rem;text-align:center}
+.stat-num{font-family:'DM Serif Display',serif;font-size:26px;font-weight:400}
+.stat-label{font-size:12px;color:var(--text-2);margin-top:.15rem}
+.live-dot{width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.copy-box{display:flex;align-items:center;gap:.5rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:.5rem .75rem;font-size:13px;font-family:monospace;color:var(--text-2);margin-top:.5rem;word-break:break-all}
+.copy-box button{flex-shrink:0;padding:.3rem .7rem;font-size:12px}
+/* Login */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:2.5rem;width:100%;max-width:400px;box-shadow:var(--shadow)}
+.login-card h1{font-family:'DM Serif Display',serif;font-size:24px;margin-bottom:.3rem}
+.login-card p{font-size:14px;color:var(--text-2);margin-bottom:1.5rem}
+/* Config modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:100;display:flex;align-items:center;justify-content:center;padding:1rem}
+.modal{background:var(--surface);border-radius:var(--r-lg);padding:1.75rem;max-width:560px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.2);max-height:90vh;overflow-y:auto}
+.modal h2{font-family:'DM Serif Display',serif;font-size:20px;margin-bottom:.3rem}
+.modal p{font-size:13px;color:var(--text-2);margin-bottom:1.25rem}
+.step-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;margin-right:.4rem;flex-shrink:0}
+.setup-step{display:flex;align-items:flex-start;gap:.75rem;margin-bottom:1.25rem;font-size:13px;color:var(--text-2);line-height:1.6}
+.setup-step code{background:var(--bg);padding:1px 6px;border-radius:4px;font-size:12px;color:var(--text)}
+</style>
+</head>
+<body>
+
+<!-- LOGIN SCREEN -->
+<div class="login-wrap" id="login-screen">
+  <div class="login-card">
+    <h1>CBC Admin</h1>
+    <p>Onderzoekersomgeving · Voer de beheercode in om verder te gaan.</p>
+    <div class="field">
+      <label>Beheercode</label>
+      <input type="password" id="login-code" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div id="login-err" style="display:none" class="err-box">Ongeldige code.</div>
+    <button class="btn btn-primary" onclick="doLogin()" style="width:100%;margin-top:.25rem">Inloggen →</button>
+    <p style="margin-top:1rem;font-size:12px;color:var(--text-3)">Standaardcode: <strong>cbc2025</strong> — wijzig dit in config.js</p>
+  </div>
+</div>
+
+<!-- SUPABASE CONFIG MODAL (first run) -->
+<div class="modal-bg" id="config-modal" style="display:none">
+  <div class="modal">
+    <h2>Supabase koppelen</h2>
+    <p>Eenmalige instelling. Maak een gratis account op supabase.com en volg deze stappen:</p>
+
+    <div class="setup-step"><span class="step-badge">1</span><div>Ga naar <strong>supabase.com</strong> → New project → kies een naam en wachtwoord.</div></div>
+    <div class="setup-step"><span class="step-badge">2</span><div>Ga naar <strong>Project Settings → API</strong>. Kopieer de <code>Project URL</code> en de <code>anon public</code> key.</div></div>
+    <div class="setup-step"><span class="step-badge">3</span><div>Ga naar de <strong>SQL Editor</strong> in Supabase en plak dit SQL-blok om de tabellen aan te maken:<br>
+      <div style="background:var(--bg);border-radius:8px;padding:.75rem;margin-top:.5rem;font-size:12px;font-family:monospace;color:var(--text);white-space:pre-wrap;line-height:1.6">CREATE TABLE studies (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text, author text, description text,
+  attrs jsonb, design jsonb,
+  opts_per_set int DEFAULT 3,
+  show_none boolean DEFAULT true,
+  admin_code text,
+  created_at timestamptz DEFAULT now()
+);
+
+CREATE TABLE responses (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  study_id uuid REFERENCES studies(id),
+  respondent_name text,
+  respondent_role text,
+  answers jsonb,
+  duration_sec int,
+  submitted_at timestamptz DEFAULT now()
+);
+
+-- Allow public read/write (voor GitHub Pages zonder auth)
+ALTER TABLE studies ENABLE ROW LEVEL SECURITY;
+ALTER TABLE responses ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "public_all" ON studies FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "public_all" ON responses FOR ALL USING (true) WITH CHECK (true);</div>
+    </div></div>
+    <div class="setup-step"><span class="step-badge">4</span><div>Plak je gegevens hieronder:</div></div>
+
+    <div class="field">
+      <label>Supabase Project URL</label>
+      <input type="text" id="cfg-url" placeholder="https://xxxxxxxxxxxx.supabase.co">
+    </div>
+    <div class="field">
+      <label>Supabase anon public key</label>
+      <input type="text" id="cfg-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+    </div>
+    <div id="cfg-err" style="display:none" class="err-box"></div>
+    <button class="btn btn-primary" onclick="saveConfig()" style="width:100%;margin-top:.5rem">Verbinding testen &amp; opslaan →</button>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div class="shell" id="app-shell" style="display:none">
+
+<nav class="sidebar">
+  <div class="logo">CBC Admin</div>
+  <div class="logo-sub">Onderzoeker</div>
+  <button class="nav-item active" id="nav0" onclick="goTo(0)"><span class="num">1</span>Ontwerp</button>
+  <button class="nav-item" id="nav1" onclick="goTo(1)"><span class="num">2</span>Keuzesituaties</button>
+  <button class="nav-item" id="nav2" onclick="goTo(2)"><span class="num">3</span>Publiceren</button>
+  <button class="nav-item" id="nav3" onclick="goTo(3)"><span class="num">4</span>Responses</button>
+  <div class="nav-sep"></div>
+  <div class="sidebar-stat"><strong>Studie</strong><span id="sb-title">—</span></div>
+  <div class="sidebar-stat"><strong>Responses</strong><span id="sb-resp">0</span></div>
+  <div class="sidebar-stat"><strong>Status</strong><span id="sb-status">—</span></div>
+  <div class="nav-sep"></div>
+  <button class="btn btn-sm" onclick="showConfigModal()" style="font-size:12px;color:var(--text-3);border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.05);color:#9E9890">⚙ Supabase instellen</button>
+  <div class="sidebar-footer">CBC Tool · HBO Bedrijfskunde</div>
+</nav>
+
+<main class="main">
+
+<!-- STAP 1: ONTWERP -->
+<div class="section active" id="s0">
+  <div class="page-header">
+    <h1>Onderzoeksontwerp</h1>
+    <p>Definieer het vraagstuk, de attributen en niveaus. Sla op om verder te gaan.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">Studiegegevens</div>
+    <div class="field-row">
+      <div class="field"><label>Naam van het onderzoek</label><input type="text" id="study-title" placeholder="bijv. Werkplekinrichting na fusie" oninput="updateSidebar()"></div>
+      <div class="field"><label>Onderzoeker(s)</label><input type="text" id="study-author" placeholder="bijv. Groep 3B"></div>
+    </div>
+    <div class="field"><label>Beschrijving / context</label><textarea id="study-desc" rows="2" placeholder="Wat onderzoek je? Voor welke organisatie?"></textarea></div>
+    <div class="field-row">
+      <div class="field"><label>Opties per situatie</label><select id="opts-per-set"><option value="2">2 opties</option><option value="3" selected>3 opties</option><option value="4">4 opties</option></select></div>
+      <div class="field"><label>"Geen van allen" tonen?</label><select id="show-none"><option value="1">Ja</option><option value="0">Nee</option></select></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Attributen &amp; niveaus</div>
+    <div class="info-box">Voeg 2–6 attributen toe, elk met 2–4 niveaus. Houd niveaus concreet en realistisch.</div>
+    <div id="attrs-container"></div>
+    <button class="btn btn-sm" onclick="addAttr()">+ Attribuut toevoegen</button>
+  </div>
+  <div class="card" id="val-card"><div class="card-title">Controle</div><div id="val-out"></div></div>
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="goTo(1)">Genereer keuzesituaties →</button>
+  </div>
+</div>
+
+<!-- STAP 2: DESIGN -->
+<div class="section" id="s1">
+  <div class="page-header">
+    <h1>Keuzesituaties</h1>
+    <p>Genereer het fractionele design en controleer de combinaties.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">Design-instellingen</div>
+    <div class="field-row">
+      <div class="field"><label>Situaties per respondent</label><select id="sets-count"><option value="4">4</option><option value="6" selected>6</option><option value="8">8</option><option value="10">10</option></select></div>
+      <div class="field"><label>&nbsp;</label><button class="btn btn-primary" onclick="generateDesign()" style="width:100%">Genereer design</button></div>
+    </div>
+  </div>
+  <div id="design-output"></div>
+  <div class="btn-row" id="design-nav" style="display:none">
+    <button class="btn" onclick="goTo(0)">← Terug</button>
+    <button class="btn btn-primary" onclick="goTo(2)">Opslaan &amp; publiceren →</button>
+  </div>
+</div>
+
+<!-- STAP 3: PUBLICEREN -->
+<div class="section" id="s2">
+  <div class="page-header">
+    <h1>Opslaan &amp; publiceren</h1>
+    <p>Sla het onderzoek op in Supabase en deel de survey-link met respondenten.</p>
+  </div>
+  <div class="card">
+    <div class="card-title">Opslaan in Supabase</div>
+    <div id="publish-status"></div>
+    <button class="btn btn-primary" id="publish-btn" onclick="publishStudy()">Onderzoek opslaan →</button>
+  </div>
+  <div class="card" id="share-card" style="display:none">
+    <div class="card-title">Survey-link voor respondenten</div>
+    <p style="font-size:14px;color:var(--text-2);margin-bottom:.75rem">Deel deze link met je respondenten. Ze komen direct in de survey terecht — geen login nodig.</p>
+    <div class="copy-box" id="survey-link-box">
+      <span id="survey-link-text" style="flex:1">—</span>
+      <button class="btn btn-sm" onclick="copyLink()">Kopieer</button>
+    </div>
+    <div style="margin-top:.875rem">
+      <div class="info-box">💡 Op GitHub Pages wordt dit automatisch de juiste URL. Test de link eerst zelf voordat je hem deelt.</div>
+    </div>
+  </div>
+  <div class="card" id="github-card" style="display:none">
+    <div class="card-title">GitHub Pages deployen</div>
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:1rem">Volg deze stappen om de app gratis online te zetten:</p>
+    <div class="setup-step"><span class="step-badge">1</span><div>Maak een gratis account op <strong>github.com</strong> als je dat nog niet hebt.</div></div>
+    <div class="setup-step"><span class="step-badge">2</span><div>Maak een nieuw repository aan: <strong>New → Repository name</strong> bijv. <code>cbc-onderzoek</code> → <strong>Public → Create repository</strong>.</div></div>
+    <div class="setup-step"><span class="step-badge">3</span><div>Upload de bestanden <code>admin.html</code>, <code>survey.html</code> en <code>config.js</code> via <strong>Add file → Upload files</strong>.</div></div>
+    <div class="setup-step"><span class="step-badge">4</span><div>Ga naar <strong>Settings → Pages → Source: Deploy from branch → main → / (root) → Save</strong>.</div></div>
+    <div class="setup-step"><span class="step-badge">5</span><div>Na ~1 minuut is je app live op <code>https://[jouw-username].github.io/cbc-onderzoek/survey.html</code></div></div>
+    <div class="setup-step"><span class="step-badge">6</span><div>Kopieer de <code>config.js</code> inhoud hieronder en upload die ook naar je repository:</div></div>
+    <div style="background:var(--bg);border-radius:8px;padding:.875rem;font-size:12px;font-family:monospace;color:var(--text);white-space:pre-wrap;line-height:1.7;border:1px solid var(--border)" id="config-js-preview"></div>
+    <button class="btn btn-sm" onclick="downloadConfigJS()" style="margin-top:.75rem">Download config.js</button>
+  </div>
+</div>
+
+<!-- STAP 4: RESPONSES -->
+<div class="section" id="s3">
+  <div class="page-header">
+    <h1>Responses <span class="live-dot" style="margin-left:.5rem"></span></h1>
+    <p>Live overzicht van ingediende antwoorden. Ververst automatisch elke 30 seconden.</p>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-num" id="stat-total">0</div><div class="stat-label">Respondenten</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-complete">0</div><div class="stat-label">Volledig ingevuld</div></div>
+    <div class="stat-card"><div class="stat-num" id="stat-avg">—</div><div class="stat-label">Gem. duur</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Respondenten</span>
+      <div style="display:flex;gap:.5rem">
+        <button class="btn btn-sm" onclick="loadResponses()">↻ Ververs</button>
+        <button class="btn btn-sm btn-primary" onclick="exportCSV()">CSV exporteren</button>
+      </div>
+    </div>
+    <div id="resp-table-wrap"><div style="color:var(--text-3);font-size:14px;padding:1rem 0">Laden…</div></div>
+  </div>
+</div>
+
+</main>
+</div>
+
+<script>
+// ─── Config & State ───────────────────────────────────────────────────
+let ADMIN_CODE = 'cbc2025'; // Change in config.js
+let supabaseClient = null;
+let attrs = [];
+let design = [];
+let currentStudyId = null;
+let attrIdCounter = 0;
+let refreshTimer = null;
+
+// Load config.js if it exists (overrides defaults)
+(function loadConfig(){
+  const s = document.createElement('script');
+  s.src = 'config.js';
+  s.onerror = () => {}; // ok if missing
+  document.head.appendChild(s);
+})();
+
+// ─── Login ────────────────────────────────────────────────────────────
+function doLogin(){
+  const code = document.getElementById('login-code').value;
+  const expected = (typeof CBC_CONFIG !== 'undefined' && CBC_CONFIG.adminCode) ? CBC_CONFIG.adminCode : ADMIN_CODE;
+  if(code !== expected){
+    document.getElementById('login-err').style.display = 'block';
+    return;
+  }
+  document.getElementById('login-screen').style.display = 'none';
+  initApp();
+}
+
+// ─── App init ─────────────────────────────────────────────────────────
+function initApp(){
+  document.getElementById('app-shell').style.display = 'grid';
+  // Init Supabase
+  const url = localStorage.getItem('sb_url') || (typeof CBC_CONFIG!=='undefined'?CBC_CONFIG.supabaseUrl:'');
+  const key = localStorage.getItem('sb_key') || (typeof CBC_CONFIG!=='undefined'?CBC_CONFIG.supabaseKey:'');
+  if(url && key){
+    supabaseClient = supabase.createClient(url, key);
+    document.getElementById('sb-status').textContent = '● Verbonden';
+  } else {
+    showConfigModal();
+  }
+  // Load saved study from localStorage
+  const saved = localStorage.getItem('cbc_study');
+  if(saved){
+    try{
+      const d = JSON.parse(saved);
+      document.getElementById('study-title').value = d.title||'';
+      document.getElementById('study-author').value = d.author||'';
+      document.getElementById('study-desc').value = d.desc||'';
+      document.getElementById('opts-per-set').value = d.optsPerSet||3;
+      document.getElementById('show-none').value = d.showNone?'1':'0';
+      attrs = d.attrs||[];
+      design = d.design||[];
+      currentStudyId = d.studyId||null;
+      attrIdCounter = attrs.length;
+      renderAttrs();
+      if(design.length>0) renderDesign(attrs.map(a=>({...a,levels:a.levels.filter(l=>l.trim())})), design.length, parseInt(document.getElementById('opts-per-set').value));
+      updateSidebar();
+      return;
+    }catch(e){}
+  }
+  // Default attrs
+  addAttr('Werkplekindeling',['Vaste werkplek','Flex per team','Open flexwerken']);
+  addAttr('Aanwezigheidsnorm',['Geen verplichting','2 dagen/week','4 dagen/week']);
+  addAttr('Besluitvorming',['Medewerkers meedenken','Team-leads beslissen','Management beslist']);
+  addAttr('Implementatietempo',['Gefaseerd (6 mnd)','Matig snel (3 mnd)','Direct (1 mnd)']);
+  validateDesign();
+  updateSidebar();
+}
+
+// ─── Supabase config modal ────────────────────────────────────────────
+function showConfigModal(){ document.getElementById('config-modal').style.display='flex'; }
+
+async function saveConfig(){
+  const url = document.getElementById('cfg-url').value.trim().replace(/\/+$/, '');
+  const key = document.getElementById('cfg-key').value.trim();
+  const errEl = document.getElementById('cfg-err');
+  errEl.style.display='none';
+  if(!url||!key){ errEl.textContent='Vul beide velden in.'; errEl.style.display='block'; return; }
+  if(!url.startsWith('https://')){ errEl.textContent='URL moet beginnen met https://'; errEl.style.display='block'; return; }
+
+  const btn = document.querySelector('#config-modal .btn-primary');
+  btn.textContent = 'Verbinding testen…'; btn.disabled = true;
+
+  try{
+    // Test via plain fetch to avoid Supabase DataCloneError bug
+    const res = await fetch(`${url}/rest/v1/studies?select=id&limit=1`, {
+      headers: { 'apikey': key, 'Authorization': 'Bearer ' + key }
+    });
+    // 200 = ok, 401 = wrong key, 404 = wrong URL, anything else unexpected
+    if(res.status === 401){
+      errEl.textContent = 'Ongeldige API key. Kopieer de "anon public" key uit Supabase → Project Settings → API.';
+      errEl.style.display='block'; return;
+    }
+    if(res.status === 404){
+      errEl.textContent = 'Project URL niet gevonden. Controleer de URL in Supabase → Project Settings → API.';
+      errEl.style.display='block'; return;
+    }
+    if(!res.ok && res.status !== 406){
+      // 406 = RLS blocks read but connection works — that's fine
+      const body = await res.text().catch(()=>'');
+      errEl.textContent = `Onverwachte fout (${res.status}): ${body.slice(0,120)}`;
+      errEl.style.display='block'; return;
+    }
+    // Success — save and init client
+    localStorage.setItem('sb_url', url);
+    localStorage.setItem('sb_key', key);
+    supabaseClient = supabase.createClient(url, key);
+    document.getElementById('config-modal').style.display='none';
+    document.getElementById('sb-status').textContent='● Verbonden';
+    updateConfigPreview();
+  } catch(e){
+    // Network error (CORS, offline, etc.)
+    errEl.textContent = 'Kan Supabase niet bereiken. Controleer je internetverbinding en of de URL correct is. (' + (e.message||e) + ')';
+    errEl.style.display='block';
+  } finally {
+    btn.textContent = 'Verbinding testen & opslaan →'; btn.disabled = false;
+  }
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────
+function goTo(i){
+  if(i===1){collectAttrs();if(!validateDesign(true))return;}
+  if(i===2){collectAttrs();preparePublish();}
+  if(i===3){loadResponses();startAutoRefresh();}else{stopAutoRefresh();}
+  document.querySelectorAll('.section').forEach((s,idx)=>s.classList.toggle('active',idx===i));
+  document.querySelectorAll('.nav-item').forEach((b,idx)=>b.classList.toggle('active',idx===i));
+  window.scrollTo(0,0);
+}
+
+function updateSidebar(){
+  document.getElementById('sb-title').textContent = document.getElementById('study-title').value||'—';
+}
+
+// ─── Attr builder ─────────────────────────────────────────────────────
+function addAttr(name='',levels=[]){
+  const id=attrIdCounter++;
+  attrs.push({id,name,levels:levels.length?[...levels]:['','']});
+  renderAttrs();
+}
+function renderAttrs(){
+  const c=document.getElementById('attrs-container');
+  c.innerHTML='';
+  attrs.forEach((a,ai)=>{
+    const d=document.createElement('div');
+    d.className='attr-block';
+    d.innerHTML=`
+      <div class="attr-header">
+        <input class="attr-name-input" value="${esc(a.name)}" placeholder="Attribuut ${ai+1}"
+          oninput="attrs[${ai}].name=this.value;validateDesign()">
+        <button class="btn btn-sm btn-danger" onclick="removeAttr(${ai})">Verwijder</button>
+      </div>
+      <div class="levels-row">
+        ${a.levels.map((l,li)=>`
+          <span class="level-chip">
+            <input class="level-input" value="${esc(l)}" placeholder="Niveau ${li+1}"
+              oninput="attrs[${ai}].levels[${li}]=this.value;validateDesign()"
+              style="width:${Math.max(60,l.length*9)}px">
+            ${a.levels.length>2?`<button class="level-del" onclick="removeLevel(${ai},${li})">×</button>`:''}
+          </span>`).join('')}
+        ${a.levels.length<4?`<button class="add-level-btn" onclick="addLevel(${ai})">+ niveau</button>`:''}
+      </div>`;
+    c.appendChild(d);
+  });
+  validateDesign();
+}
+function collectAttrs(){ /* bound via oninput */ }
+function removeAttr(i){attrs.splice(i,1);renderAttrs();}
+function addLevel(ai){attrs[ai].levels.push('');renderAttrs();}
+function removeLevel(ai,li){if(attrs[ai].levels.length>2){attrs[ai].levels.splice(li,1);renderAttrs();}}
+
+function validateDesign(strict=false){
+  const out=document.getElementById('val-out');
+  let msgs=[],ok=true;
+  if(attrs.length<2){msgs.push({t:'err',m:'Voeg minimaal 2 attributen toe.'});ok=false;}
+  attrs.forEach((a,i)=>{
+    if(!a.name.trim()){msgs.push({t:'err',m:`Attribuut ${i+1} heeft geen naam.`});ok=false;}
+    if(a.levels.filter(l=>l.trim()).length<2){msgs.push({t:'err',m:`"${a.name||'Attribuut '+(i+1)}" heeft minimaal 2 niveaus nodig.`});ok=false;}
+  });
+  if(ok&&msgs.length===0) msgs.push({t:'ok',m:`✓ Design geldig: ${attrs.length} attributen, ${attrs.reduce((s,a)=>s+a.levels.filter(l=>l.trim()).length,0)} niveaus.`});
+  out.innerHTML=msgs.map(m=>`<div class="${m.t==='ok'?'info-box':m.t==='warn'?'warn-box':'err-box'}">${m.m}</div>`).join('');
+  if(strict&&!ok){alert('Los eerst de fouten op.');return false;}
+  return ok;
+}
+
+// ─── Design generation ────────────────────────────────────────────────
+function generateDesign(){
+  collectAttrs();
+  if(!validateDesign(true))return;
+  const numSets=parseInt(document.getElementById('sets-count').value);
+  const optsPerSet=parseInt(document.getElementById('opts-per-set').value);
+  const cleanAttrs=attrs.map(a=>({...a,levels:a.levels.filter(l=>l.trim())}));
+  let all=[[]];
+  cleanAttrs.forEach(a=>{const next=[];all.forEach(c=>a.levels.forEach(l=>next.push([...c,l])));all=next;});
+  all=shuffle(all,42);
+  let pool=[...all];
+  design=[];
+  for(let s=0;s<numSets;s++){
+    const setOpts=[];
+    for(let o=0;o<optsPerSet;o++){
+      let best=null,bestScore=-1;
+      for(let ci=0;ci<Math.min(pool.length,optsPerSet*6);ci++){
+        const score=scoreDiversity(pool[ci],setOpts,cleanAttrs)+Math.random()*.05;
+        if(score>bestScore){bestScore=score;best=ci;}
+      }
+      if(best===null)best=0;
+      setOpts.push(pool[best]);
+      pool.splice(best,1);
+      if(pool.length===0)pool=[...shuffle(all,s*17+o)];
+    }
+    design.push(setOpts);
+  }
+  renderDesign(cleanAttrs,numSets,optsPerSet);
+  saveLocal();
+}
+
+function scoreDiversity(c,existing,cleanAttrs){
+  if(!existing.length)return 0;
+  return existing.reduce((s,e)=>s+cleanAttrs.filter((_,i)=>c[i]!==e[i]).length,0);
+}
+function shuffle(arr,seed){
+  const a=[...arr];let s=seed;
+  for(let i=a.length-1;i>0;i--){s=(s*1664525+1013904223)&0xffffffff;const j=Math.abs(s)%(i+1);[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+function renderDesign(cleanAttrs,numSets,optsPerSet){
+  const out=document.getElementById('design-output');
+  const showNone=document.getElementById('show-none').value==='1';
+  let html=`<div class="card"><div class="card-title">Gegenereerd design — ${numSets} keuzesituaties</div><div style="overflow-x:auto"><table class="matrix-table"><thead><tr><th>Set</th><th>Optie</th>`;
+  cleanAttrs.forEach(a=>{html+=`<th>${esc(a.name)}</th>`;});
+  html+=`</tr></thead><tbody>`;
+  design.forEach((set,si)=>{
+    set.forEach((opt,oi)=>{
+      html+=`<tr><td class="set-num">${si+1}</td><td>Optie ${String.fromCharCode(65+oi)}</td>`;
+      opt.forEach(v=>{html+=`<td>${esc(v)}</td>`;});
+      html+=`</tr>`;
+    });
+    if(showNone) html+=`<tr style="opacity:.45"><td class="set-num">${si+1}</td><td colspan="${cleanAttrs.length+1}" style="font-style:italic;font-size:12px">Geen van de opties</td></tr>`;
+    html+=`<tr><td colspan="${cleanAttrs.length+2}" style="height:4px;background:var(--bg);padding:0"></td></tr>`;
+  });
+  html+=`</tbody></table></div></div>`;
+  out.innerHTML=html;
+  document.getElementById('design-nav').style.display='flex';
+}
+
+// ─── Publish ──────────────────────────────────────────────────────────
+function preparePublish(){
+  updateConfigPreview();
+  document.getElementById('share-card').style.display='none';
+  document.getElementById('github-card').style.display='block';
+  if(currentStudyId){
+    const base=window.location.href.replace('admin.html','');
+    document.getElementById('survey-link-text').textContent=base+'survey.html?study='+currentStudyId;
+    document.getElementById('share-card').style.display='block';
+  }
+}
+
+async function publishStudy(){
+  if(!supabaseClient){alert('Koppel eerst Supabase via de knop linksonder.');showConfigModal();return;}
+  const btn=document.getElementById('publish-btn');
+  btn.textContent='Opslaan…';btn.disabled=true;
+  const cleanAttrs=attrs.map(a=>({...a,levels:a.levels.filter(l=>l.trim())}));
+  const adminCode=(typeof CBC_CONFIG!=='undefined'&&CBC_CONFIG.adminCode)?CBC_CONFIG.adminCode:ADMIN_CODE;
+  const payload={
+    title:document.getElementById('study-title').value||'Naamloos onderzoek',
+    author:document.getElementById('study-author').value||'',
+    description:document.getElementById('study-desc').value||'',
+    attrs:cleanAttrs,design,
+    opts_per_set:parseInt(document.getElementById('opts-per-set').value),
+    show_none:document.getElementById('show-none').value==='1',
+    admin_code:adminCode
+  };
+  try{
+    let result;
+    if(currentStudyId){
+      result=await supabaseClient.from('studies').update(payload).eq('id',currentStudyId).select().single();
+    } else {
+      result=await supabaseClient.from('studies').insert(payload).select().single();
+    }
+    if(result.error) throw result.error;
+    currentStudyId=result.data.id;
+    saveLocal();
+    document.getElementById('publish-status').innerHTML='<div class="info-box">✓ Opgeslagen! Study ID: <code>'+currentStudyId+'</code></div>';
+    const base=window.location.href.replace('admin.html','');
+    const link=base+'survey.html?study='+currentStudyId;
+    document.getElementById('survey-link-text').textContent=link;
+    document.getElementById('share-card').style.display='block';
+  }catch(e){
+    document.getElementById('publish-status').innerHTML='<div class="err-box">Fout: '+e.message+'</div>';
+  }
+  btn.textContent='Onderzoek opslaan →';btn.disabled=false;
+}
+
+function copyLink(){
+  const txt=document.getElementById('survey-link-text').textContent;
+  navigator.clipboard.writeText(txt).then(()=>alert('Link gekopieerd!'));
+}
+
+function updateConfigPreview(){
+  const url=localStorage.getItem('sb_url')||'';
+  const key=localStorage.getItem('sb_key')||'';
+  const adminCode=(typeof CBC_CONFIG!=='undefined'&&CBC_CONFIG.adminCode)?CBC_CONFIG.adminCode:ADMIN_CODE;
+  const preview=`// config.js — Voeg dit bestand toe aan je GitHub repository
+const CBC_CONFIG = {
+  supabaseUrl: "${url}",
+  supabaseKey: "${key}",
+  adminCode: "${adminCode}"
+};`;
+  const el=document.getElementById('config-js-preview');
+  if(el) el.textContent=preview;
+}
+
+function downloadConfigJS(){
+  const url=localStorage.getItem('sb_url')||'';
+  const key=localStorage.getItem('sb_key')||'';
+  const adminCode=(typeof CBC_CONFIG!=='undefined'&&CBC_CONFIG.adminCode)?CBC_CONFIG.adminCode:ADMIN_CODE;
+  const content=`// config.js — Voeg dit bestand toe aan je GitHub repository\nconst CBC_CONFIG = {\n  supabaseUrl: "${url}",\n  supabaseKey: "${key}",\n  adminCode: "${adminCode}"\n};`;
+  const a=document.createElement('a');
+  a.href='data:text/javascript;charset=utf-8,'+encodeURIComponent(content);
+  a.download='config.js';a.click();
+}
+
+// ─── Responses ────────────────────────────────────────────────────────
+async function loadResponses(){
+  if(!supabaseClient||!currentStudyId){
+    document.getElementById('resp-table-wrap').innerHTML='<div class="warn-box">Sla eerst het onderzoek op in stap 3.</div>';
+    return;
+  }
+  const wrap=document.getElementById('resp-table-wrap');
+  wrap.innerHTML='<div style="color:var(--text-3);font-size:14px;padding:.5rem 0">Laden…</div>';
+  try{
+    const {data,error}=await supabaseClient.from('responses').select('*').eq('study_id',currentStudyId).order('submitted_at',{ascending:false});
+    if(error)throw error;
+    const total=data.length;
+    const numSets=design.length;
+    const complete=data.filter(r=>r.answers&&r.answers.length>=numSets).length;
+    const avgDur=total>0?Math.round(data.reduce((s,r)=>s+(r.duration_sec||0),0)/total):0;
+    document.getElementById('stat-total').textContent=total;
+    document.getElementById('stat-complete').textContent=complete;
+    document.getElementById('stat-avg').textContent=total>0?avgDur+'s':'—';
+    document.getElementById('sb-resp').textContent=total;
+    if(total===0){wrap.innerHTML='<div style="color:var(--text-3);font-size:14px;padding:1rem 0">Nog geen responses. Deel de survey-link met respondenten.</div>';return;}
+    const cleanAttrs=attrs.map(a=>({...a,levels:a.levels.filter(l=>l.trim())}));
+    let html=`<div style="overflow-x:auto"><table class="resp-table"><thead><tr>
+      <th>Respondent</th><th>Functie</th><th>Keuzes</th><th>Duur</th><th>Tijdstip</th><th></th></tr></thead><tbody>`;
+    data.forEach(r=>{
+      const answers=r.answers||[];
+      const dt=new Date(r.submitted_at);
+      const time=dt.toLocaleDateString('nl-NL',{day:'2-digit',month:'short'})+' '+dt.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+      const done=answers.length>=numSets;
+      html+=`<tr>
+        <td><div style="display:flex;align-items:center;gap:.6rem">
+          <div class="resp-avatar">${(r.respondent_name||'?').substring(0,2).toUpperCase()}</div>
+          <strong style="font-size:14px">${esc(r.respondent_name||'—')}</strong>
+        </div></td>
+        <td style="color:var(--text-2)">${esc(r.respondent_role||'—')}</td>
+        <td><span class="badge ${done?'badge-green':'badge-warn'}">${answers.length}/${numSets}</span></td>
+        <td style="color:var(--text-2)">${r.duration_sec||'—'}s</td>
+        <td style="color:var(--text-2);font-size:12px">${time}</td>
+        <td><button class="btn btn-sm btn-danger" onclick="deleteResponse('${r.id}')">×</button></td>
+      </tr>`;
+    });
+    html+=`</tbody></table></div>`;
+    wrap.innerHTML=html;
+  }catch(e){
+    wrap.innerHTML=`<div class="err-box">Fout bij laden: ${e.message}</div>`;
+  }
+}
+
+async function deleteResponse(id){
+  if(!confirm('Respondent verwijderen?'))return;
+  await supabaseClient.from('responses').delete().eq('id',id);
+  loadResponses();
+}
+
+function startAutoRefresh(){refreshTimer=setInterval(loadResponses,30000);}
+function stopAutoRefresh(){if(refreshTimer)clearInterval(refreshTimer);}
+
+// ─── CSV export ───────────────────────────────────────────────────────
+async function exportCSV(){
+  if(!supabaseClient||!currentStudyId){alert('Geen data beschikbaar.');return;}
+  const {data}=await supabaseClient.from('responses').select('*').eq('study_id',currentStudyId).order('submitted_at',{ascending:true});
+  const cleanAttrs=attrs.map(a=>({...a,levels:a.levels.filter(l=>l.trim())}));
+  const optsPerSet=parseInt(document.getElementById('opts-per-set').value);
+  const showNone=document.getElementById('show-none').value==='1';
+  let rows=[['Respondent','Functie','Situatie','Optie',...cleanAttrs.map(a=>a.name),'Gekozen','Tijdstip']];
+  data.forEach(r=>{
+    (r.answers||[]).forEach((chosen,si)=>{
+      if(si>=design.length)return;
+      design[si].forEach((opt,oi)=>{
+        const isChosen=(!(showNone&&chosen===optsPerSet))&&oi===chosen?1:0;
+        rows.push([r.respondent_name,r.respondent_role||'',si+1,String.fromCharCode(65+oi),...opt,isChosen,r.submitted_at]);
+      });
+      if(showNone){
+        rows.push([r.respondent_name,r.respondent_role||'',si+1,'Geen',...Array(cleanAttrs.length).fill('—'),chosen===optsPerSet?1:0,r.submitted_at]);
+      }
+    });
+  });
+  const bom='\uFEFF';
+  const csv=bom+rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(';')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='cbc-responses.csv';a.click();
+}
+
+// ─── Local save ───────────────────────────────────────────────────────
+function saveLocal(){
+  localStorage.setItem('cbc_study',JSON.stringify({
+    title:document.getElementById('study-title').value,
+    author:document.getElementById('study-author').value,
+    desc:document.getElementById('study-desc').value,
+    optsPerSet:document.getElementById('opts-per-set').value,
+    showNone:document.getElementById('show-none').value==='1',
+    attrs,design,studyId:currentStudyId
+  }));
+}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+</script>
+</body>
+</html>

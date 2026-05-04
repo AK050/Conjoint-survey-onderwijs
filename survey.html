@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CBC Survey</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#F5F3EE;--surface:#fff;--border:#E2DDD6;
+  --text:#1A1814;--text-2:#6B6560;--text-3:#9E9890;
+  --accent:#2D5F4F;--accent-light:#EAF2EE;--accent-mid:#4A8B74;
+  --danger:#C0392B;--danger-light:#FDEDEC;
+  --r:10px;--r-lg:16px;--shadow:0 1px 3px rgba(0,0,0,.06),0 4px 12px rgba(0,0,0,.04);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.6;min-height:100vh}
+.page{max-width:680px;margin:0 auto;padding:2rem 1.25rem}
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem}
+.logo{font-family:'DM Serif Display',serif;font-size:18px}
+.progress-label{font-size:13px;color:var(--text-2)}
+.progress-track{height:3px;background:var(--border);border-radius:2px;margin-bottom:2rem;overflow:hidden}
+.progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s cubic-bezier(.4,0,.2,1)}
+h1{font-family:'DM Serif Display',serif;font-size:24px;font-weight:400;margin-bottom:.35rem}
+h2{font-family:'DM Serif Display',serif;font-size:21px;font-weight:400;margin-bottom:.35rem}
+p{color:var(--text-2);font-size:14px;margin-bottom:.75rem}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:1.375rem;margin-bottom:1.125rem;box-shadow:var(--shadow)}
+.field{margin-bottom:.875rem}
+label{display:block;font-size:13px;font-weight:500;color:var(--text-2);margin-bottom:.3rem}
+input[type=text]{width:100%;padding:.575rem .8rem;border:1px solid var(--border);border-radius:var(--r);font-family:inherit;font-size:14px;color:var(--text);background:var(--surface);outline:none;transition:border-color .15s}
+input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(45,95,79,.1)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:.6rem 1.25rem;border-radius:var(--r);border:1px solid var(--border);background:var(--surface);font-family:inherit;font-size:14px;font-weight:500;color:var(--text);cursor:pointer;transition:all .15s}
+.btn:hover{background:var(--bg)}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+.btn-primary:hover{background:#245040}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+/* Intro screen */
+.intro-header{background:var(--text);color:#fff;border-radius:var(--r-lg);padding:2rem;margin-bottom:1.5rem}
+.intro-header h1{color:#fff}
+.intro-header p{color:rgba(255,255,255,.65)}
+.intro-meta{display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.75rem}
+.meta-chip{background:rgba(255,255,255,.12);color:rgba(255,255,255,.8);font-size:12px;padding:3px 10px;border-radius:20px}
+/* Choice cards */
+.choice-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.875rem;margin:1.25rem 0}
+.choice-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:1.125rem;cursor:pointer;transition:border-color .2s,box-shadow .2s,background .2s;position:relative;-webkit-tap-highlight-color:transparent}
+.choice-card:hover{border-color:var(--accent-mid);box-shadow:0 4px 16px rgba(45,95,79,.1)}
+.choice-card.selected{border-color:var(--accent);background:var(--accent-light);box-shadow:0 4px 16px rgba(45,95,79,.14)}
+.choice-card.selected::after{content:'✓';position:absolute;top:10px;right:12px;font-size:12px;font-weight:700;color:var(--accent)}
+.choice-card.none-card{background:var(--bg);border-style:dashed;text-align:center}
+.choice-card h3{font-size:14px;font-weight:600;margin-bottom:.7rem;color:var(--text)}
+.attr-line{display:flex;justify-content:space-between;gap:.5rem;font-size:13px;padding:.3rem 0;border-bottom:1px solid var(--border)}
+.attr-line:last-child{border-bottom:none}
+.attr-line .k{color:var(--text-2);flex-shrink:0}
+.attr-line .v{font-weight:500;text-align:right}
+/* Feedback */
+.feedback-box{background:var(--accent-light);border:1px solid rgba(45,95,79,.2);border-radius:var(--r);padding:.75rem 1rem;font-size:13px;color:var(--accent);margin-bottom:1rem}
+.err-box{background:var(--danger-light);border:1px solid rgba(192,57,43,.2);border-radius:var(--r);padding:.75rem 1rem;font-size:13px;color:var(--danger);margin-bottom:1rem}
+/* Done screen */
+.done-wrap{text-align:center;padding:3rem 1rem}
+.done-icon{font-size:48px;margin-bottom:1rem}
+/* Loading */
+.loading-wrap{text-align:center;padding:4rem 1rem;color:var(--text-2)}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 1rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+/* Screen switching */
+.screen{display:none}
+.screen.active{display:block}
+</style>
+</head>
+<body>
+
+<div class="page">
+
+<!-- LOADING -->
+<div class="screen active" id="screen-loading">
+  <div class="loading-wrap">
+    <div class="spinner"></div>
+    <p>Onderzoek laden…</p>
+  </div>
+</div>
+
+<!-- ERROR -->
+<div class="screen" id="screen-error">
+  <div class="card" style="margin-top:3rem">
+    <h2 style="margin-bottom:.5rem">Onderzoek niet gevonden</h2>
+    <p id="err-msg">Controleer de link of neem contact op met de onderzoeker.</p>
+  </div>
+</div>
+
+<!-- INTRO -->
+<div class="screen" id="screen-intro">
+  <div class="intro-header">
+    <h1 id="intro-title">Onderzoek</h1>
+    <p id="intro-desc"></p>
+    <div class="intro-meta">
+      <span class="meta-chip" id="intro-author"></span>
+      <span class="meta-chip" id="intro-sets"></span>
+    </div>
+  </div>
+  <div class="card">
+    <div style="font-size:14px;font-weight:500;margin-bottom:.75rem">Hoe werkt dit?</div>
+    <p style="margin-bottom:.5rem">Je krijgt een aantal keuzesituaties te zien. Elke situatie toont meerdere scenario's. Kies telkens het scenario dat jij het meest acceptabel vindt.</p>
+    <p style="margin-bottom:0">Er zijn geen goede of foute antwoorden — het gaat om jouw persoonlijke voorkeur.</p>
+  </div>
+  <div class="card">
+    <div class="field">
+      <label>Jouw naam of code</label>
+      <input type="text" id="resp-name" placeholder="bijv. R01 of je voornaam">
+    </div>
+    <div class="field" style="margin-bottom:0">
+      <label>Functie of afdeling <span style="font-weight:400;color:var(--text-3)">(optioneel)</span></label>
+      <input type="text" id="resp-role" placeholder="bijv. HR-medewerker">
+    </div>
+  </div>
+  <div id="intro-err" style="display:none" class="err-box">Vul je naam of code in om te beginnen.</div>
+  <button class="btn btn-primary" onclick="startSurvey()" style="width:100%">Start de vragenlijst →</button>
+</div>
+
+<!-- SURVEY -->
+<div class="screen" id="screen-survey">
+  <div class="top-bar">
+    <div class="logo">CBC Survey</div>
+    <div class="progress-label" id="q-label">Situatie 1 van 6</div>
+  </div>
+  <div class="progress-track"><div class="progress-fill" id="pbar" style="width:0%"></div></div>
+  <h2 id="q-title">Welk scenario kies jij?</h2>
+  <p id="q-sub">Kies het scenario dat jij het meest acceptabel vindt.</p>
+  <div id="choices"></div>
+  <div id="survey-feedback" style="display:none"></div>
+  <button class="btn btn-primary" id="next-btn" onclick="nextQ()" style="display:none;width:100%">Volgende situatie →</button>
+</div>
+
+<!-- DONE -->
+<div class="screen" id="screen-done">
+  <div class="done-wrap">
+    <div class="done-icon">✓</div>
+    <h1 style="margin-bottom:.5rem">Bedankt!</h1>
+    <p style="font-size:15px">Je antwoorden zijn opgeslagen. Je kunt dit venster sluiten.</p>
+    <p style="margin-top:1.5rem;font-size:13px;color:var(--text-3)" id="done-meta"></p>
+  </div>
+</div>
+
+</div><!-- .page -->
+
+<script>
+// Load config
+(function(){const s=document.createElement('script');s.src='config.js';s.onerror=()=>{};document.head.appendChild(s);})();
+
+let sb = null;
+let study = null;
+let answers = [];
+let curQ = 0;
+let startTime = null;
+let respName = '';
+let respRole = '';
+
+// Wait for config to load, then init
+window.addEventListener('load', ()=>{
+  setTimeout(initSurvey, 200); // small delay for config.js
+});
+
+async function initSurvey(){
+  const url = (typeof CBC_CONFIG!=='undefined'&&CBC_CONFIG.supabaseUrl) ? CBC_CONFIG.supabaseUrl : localStorage.getItem('sb_url');
+  const key = (typeof CBC_CONFIG!=='undefined'&&CBC_CONFIG.supabaseKey) ? CBC_CONFIG.supabaseKey : localStorage.getItem('sb_key');
+  if(!url||!key){ showErr('Supabase is niet geconfigureerd. Neem contact op met de onderzoeker.'); return; }
+  sb = supabase.createClient(url, key);
+
+  const params = new URLSearchParams(window.location.search);
+  const studyId = params.get('study');
+  if(!studyId){ showErr('Geen onderzoek gevonden in de link. Controleer de URL.'); return; }
+
+  try{
+    const {data,error} = await sb.from('studies').select('*').eq('id',studyId).single();
+    if(error||!data){ showErr('Onderzoek niet gevonden. Mogelijk is de link verlopen.'); return; }
+    study = data;
+    showIntro();
+  }catch(e){
+    showErr('Verbindingsfout: '+e.message);
+  }
+}
+
+function showErr(msg){
+  document.getElementById('err-msg').textContent = msg;
+  switchScreen('screen-error');
+}
+
+function showIntro(){
+  document.getElementById('intro-title').textContent = study.title||'Onderzoek';
+  document.getElementById('intro-desc').textContent = study.description||'Geef je voorkeur aan voor elk scenario.';
+  document.getElementById('intro-author').textContent = study.author||'';
+  document.getElementById('intro-sets').textContent = (study.design||[]).length+' keuzesituaties';
+  switchScreen('screen-intro');
+}
+
+function startSurvey(){
+  respName = document.getElementById('resp-name').value.trim();
+  if(!respName){ document.getElementById('intro-err').style.display='block'; return; }
+  respRole = document.getElementById('resp-role').value.trim();
+  document.getElementById('intro-err').style.display='none';
+  startTime = Date.now();
+  curQ = 0; answers = [];
+  renderQ();
+  switchScreen('screen-survey');
+}
+
+function renderQ(){
+  const design = study.design||[];
+  const attrs = study.attrs||[];
+  const optsPerSet = study.opts_per_set||3;
+  const showNone = study.show_none;
+  const total = design.length;
+  const pct = Math.round((curQ/total)*100);
+
+  document.getElementById('q-label').textContent = `Situatie ${curQ+1} van ${total}`;
+  document.getElementById('pbar').style.width = pct+'%';
+  document.getElementById('q-title').textContent = `Situatie ${curQ+1} — Welk scenario kies jij?`;
+  document.getElementById('survey-feedback').style.display = 'none';
+  document.getElementById('next-btn').style.display = 'none';
+
+  const setOpts = design[curQ];
+  let html = '<div class="choice-grid">';
+  setOpts.forEach((opt,oi)=>{
+    html+=`<div class="choice-card" id="cc${oi}" onclick="selectOpt(${oi})">
+      <h3>Scenario ${String.fromCharCode(65+oi)}</h3>`;
+    attrs.forEach((a,ai)=>{
+      html+=`<div class="attr-line"><span class="k">${esc(a.name)}</span><span class="v">${esc(opt[ai]||'—')}</span></div>`;
+    });
+    html+=`</div>`;
+  });
+  if(showNone){
+    const ni = setOpts.length;
+    html+=`<div class="choice-card none-card" id="cc${ni}" onclick="selectOpt(${ni})">
+      <p style="color:var(--text-2);font-size:13px;padding:1.25rem 0;margin:0">Geen van deze scenario's past bij mij</p>
+    </div>`;
+  }
+  html+='</div>';
+  document.getElementById('choices').innerHTML = html;
+}
+
+function selectOpt(i){
+  document.querySelectorAll('.choice-card').forEach((c,idx)=>c.classList.toggle('selected',idx===i));
+  answers[curQ] = i;
+  const optsPerSet = study.opts_per_set||3;
+  const showNone = study.show_none;
+  const isNone = showNone && i===optsPerSet;
+  const fb = document.getElementById('survey-feedback');
+  const msg = isNone
+    ? 'Geregistreerd: geen van de opties. Ga verder naar de volgende situatie.'
+    : `Scenario ${String.fromCharCode(65+i)} geselecteerd.`;
+  fb.innerHTML = `<div class="feedback-box">${msg}</div>`;
+  fb.style.display = 'block';
+  const isLast = curQ >= (study.design||[]).length-1;
+  document.getElementById('next-btn').style.display = 'block';
+  document.getElementById('next-btn').textContent = isLast ? 'Afronden en opslaan →' : 'Volgende situatie →';
+}
+
+function nextQ(){
+  if(answers[curQ]===undefined){ alert('Kies eerst een scenario.'); return; }
+  if(curQ < (study.design||[]).length-1){
+    curQ++;
+    renderQ();
+    window.scrollTo(0,0);
+  } else {
+    submitSurvey();
+  }
+}
+
+async function submitSurvey(){
+  const btn = document.getElementById('next-btn');
+  btn.textContent = 'Opslaan…'; btn.disabled = true;
+  const duration = Math.round((Date.now()-startTime)/1000);
+  try{
+    const {error} = await sb.from('responses').insert({
+      study_id: study.id,
+      respondent_name: respName,
+      respondent_role: respRole||null,
+      answers: answers,
+      duration_sec: duration
+    });
+    if(error) throw error;
+    document.getElementById('done-meta').textContent = `${(study.design||[]).length} situaties · ${duration} seconden`;
+    switchScreen('screen-done');
+  }catch(e){
+    btn.disabled = false;
+    btn.textContent = 'Opnieuw proberen →';
+    document.getElementById('survey-feedback').innerHTML = `<div class="err-box">Opslaan mislukt: ${e.message}. Controleer je verbinding.</div>`;
+    document.getElementById('survey-feedback').style.display = 'block';
+  }
+}
+
+function switchScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===id));
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+</script>
+</body>
+</html>
