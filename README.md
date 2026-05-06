@@ -52,7 +52,7 @@ CREATE POLICY "public_all" ON responses FOR ALL USING (true) WITH CHECK (true);
 
 ## Stap 2 — config.js invullen
 
-Open `config.js` in een teksteditor en vul in:
+Open `config.js` in een teksteditor  en vul in:
 
 ```javascript
 const CBC_CONFIG = {
