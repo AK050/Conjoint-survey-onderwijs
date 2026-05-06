@@ -102,6 +102,31 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);box-shadow:0 
 .step-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;margin-right:.4rem;flex-shrink:0}
 .setup-step{display:flex;align-items:flex-start;gap:.75rem;margin-bottom:1.25rem;font-size:13px;color:var(--text-2);line-height:1.6}
 .setup-step code{background:var(--bg);padding:1px 6px;border-radius:4px;font-size:12px;color:var(--text)}
+
+/* ── Analyse styles ── */
+.importance-row{display:flex;align-items:center;gap:1rem;padding:.65rem 0;border-bottom:1px solid var(--border)}
+.importance-row:last-child{border-bottom:none}
+.importance-name{font-weight:500;min-width:170px;font-size:14px}
+.importance-pct{font-weight:700;font-size:15px;color:var(--accent);min-width:38px;text-align:right}
+.imp-bar-bg{flex:1;height:8px;background:var(--bg);border-radius:4px;overflow:hidden}
+.imp-bar-fill{height:100%;background:var(--accent);border-radius:4px;transition:width .7s}
+.utility-block{margin-bottom:1.25rem}
+.utility-attr-label{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--text-3);margin-bottom:.5rem}
+.utility-row-item{display:flex;align-items:center;gap:.75rem;margin-bottom:.35rem;font-size:13px}
+.utility-lbl{min-width:160px;color:var(--text)}
+.utility-bar-wrap{flex:1;height:10px;background:var(--bg);border-radius:5px;overflow:hidden;position:relative}
+.utility-bar-pos{height:100%;background:var(--accent);border-radius:5px;transition:width .6s}
+.utility-bar-neg{height:100%;background:var(--danger);border-radius:5px;float:right;transition:width .6s}
+.utility-val{min-width:46px;text-align:right;font-weight:600;font-variant-numeric:tabular-nums;font-size:13px}
+.seg-table{width:100%;border-collapse:collapse;font-size:13px}
+.seg-table th{background:var(--bg);padding:.45rem .7rem;text-align:left;border-bottom:1px solid var(--border);font-weight:500;color:var(--text-2);font-size:12px;white-space:nowrap}
+.seg-table td{padding:.45rem .7rem;border-bottom:1px solid var(--border);vertical-align:middle}
+.seg-table tr:hover td{background:var(--bg)}
+.profile-chip{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:4px}
+.pc-participatie{background:#EEEDFE;color:#3C3489}
+.pc-autonomie{background:#E1F5EE;color:#085041}
+.pc-pragmatisch{background:#FAEEDA;color:#633806}
+.pc-weerstand{background:#FDEDEC;color:#7a1414}
 </style>
 </head>
 <body>
@@ -181,6 +206,7 @@ CREATE POLICY "public_all" ON responses FOR ALL USING (true) WITH CHECK (true);<
   <button class="nav-item" id="nav1" onclick="goTo(1)"><span class="num">2</span>Keuzesituaties</button>
   <button class="nav-item" id="nav2" onclick="goTo(2)"><span class="num">3</span>Publiceren</button>
   <button class="nav-item" id="nav3" onclick="goTo(3)"><span class="num">4</span>Responses</button>
+  <button class="nav-item" id="nav4" onclick="goTo(4)"><span class="num">5</span>Analyse</button>
   <div class="nav-sep"></div>
   <div class="sidebar-stat"><strong>Studie</strong><span id="sb-title">—</span></div>
   <div class="sidebar-stat"><strong>Responses</strong><span id="sb-resp">0</span></div>
@@ -299,6 +325,18 @@ CREATE POLICY "public_all" ON responses FOR ALL USING (true) WITH CHECK (true);<
     </div>
     <div id="resp-table-wrap"><div style="color:var(--text-3);font-size:14px;padding:1rem 0">Laden…</div></div>
   </div>
+</div>
+
+
+<!-- STAP 5: ANALYSE -->
+<div class="section" id="s4">
+  <div class="page-header">
+    <h1>Conjoint Analyse</h1>
+    <p>Part-worth utilities, relatief belang en individuele keuzeprofielen op basis van alle verzamelde responses.</p>
+  </div>
+  <div id="analyse-loading" class="info-box" style="display:none">Analyse berekenen…</div>
+  <div id="analyse-warn" style="display:none"></div>
+  <div id="analyse-content"></div>
 </div>
 
 </main>
@@ -430,6 +468,7 @@ function goTo(i){
   if(i===1){collectAttrs();if(!validateDesign(true))return;}
   if(i===2){collectAttrs();preparePublish();}
   if(i===3){loadResponses();startAutoRefresh();}else{stopAutoRefresh();}
+  if(i===4){loadAnalyse();}
   document.querySelectorAll('.section').forEach((s,idx)=>s.classList.toggle('active',idx===i));
   document.querySelectorAll('.nav-item').forEach((b,idx)=>b.classList.toggle('active',idx===i));
   window.scrollTo(0,0);
@@ -721,6 +760,287 @@ function saveLocal(){
     showNone:document.getElementById('show-none').value==='1',
     attrs,design,studyId:currentStudyId
   }));
+}
+
+
+// ─── Analyse ──────────────────────────────────────────────────────────
+let cachedResponseData = [];
+
+async function loadAnalyse(){
+  const warn = document.getElementById('analyse-warn');
+  const content = document.getElementById('analyse-content');
+  const loading = document.getElementById('analyse-loading');
+  warn.style.display='none';
+  content.innerHTML='';
+  loading.style.display='block';
+
+  if(!supabaseClient||!currentStudyId){
+    loading.style.display='none';
+    warn.innerHTML='<div class="warn-box">Sla eerst het onderzoek op en verzamel responses.</div>';
+    warn.style.display='block';
+    return;
+  }
+  const {data,error}=await supabaseClient.from('responses').select('*').eq('study_id',currentStudyId).order('submitted_at',{ascending:true});
+  loading.style.display='none';
+  if(error){warn.innerHTML='<div class="err-box">Fout: '+error.message+'</div>';warn.style.display='block';return;}
+  if(!data||data.length<2){
+    warn.innerHTML='<div class="warn-box">Minimaal 2 responses nodig voor analyse. Nu: '+(data?data.length:0)+' response(s).</div>';
+    warn.style.display='block';return;
+  }
+  cachedResponseData = data;
+  renderAnalyse(data);
+}
+
+function renderAnalyse(data){
+  const cleanAttrs = attrs.map(a=>({...a,levels:a.levels.filter(l=>l.trim())}));
+  const optsPerSet = parseInt(document.getElementById('opts-per-set').value)||3;
+  const showNone = document.getElementById('show-none').value==='1';
+  const numSets = design.length;
+  const completeData = data.filter(r=>(r.answers||[]).length>=numSets);
+
+  // ── Frequency count per attr+level ──
+  const freq = {}; // `ai-li` -> {chosen, total}
+  cleanAttrs.forEach((a,ai)=>a.levels.forEach((_,li)=>{freq[ai+'-'+li]={chosen:0,total:0};}));
+
+  completeData.forEach(r=>{
+    (r.answers||[]).forEach((chosen,si)=>{
+      if(si>=design.length)return;
+      const setOpts=design[si];
+      const isNone=showNone&&chosen===optsPerSet;
+      setOpts.forEach((opt,oi)=>{
+        cleanAttrs.forEach((a,ai)=>{
+          const li=a.levels.indexOf(opt[ai]);
+          if(li<0)return;
+          freq[ai+'-'+li].total++;
+          if(!isNone&&oi===chosen) freq[ai+'-'+li].chosen++;
+        });
+      });
+    });
+  });
+
+  // ── Raw utilities (log-odds, centered per attr) ──
+  const rawUtils = cleanAttrs.map((a,ai)=>{
+    const u=a.levels.map((_,li)=>{
+      const d=freq[ai+'-'+li];
+      if(!d||d.total===0)return 0;
+      const p=Math.min(0.99,Math.max(0.01,d.chosen/d.total));
+      return Math.log(p/(1-p));
+    });
+    const mean=u.reduce((s,v)=>s+v,0)/u.length;
+    return u.map(v=>v-mean);
+  });
+
+  // ── Relative importance ──
+  const ranges=rawUtils.map(u=>Math.max(...u)-Math.min(...u));
+  const totalRange=ranges.reduce((s,v)=>s+v,0)||1;
+  const importance=ranges.map(r=>Math.round(r/totalRange*100));
+  const sortedAttrIdx=[...importance.keys()].sort((a,b)=>importance[b]-importance[a]);
+
+  // ── None rate ──
+  let noneCount=0,totalAnswers=0;
+  completeData.forEach(r=>{
+    (r.answers||[]).forEach((a,si)=>{if(si<numSets){totalAnswers++;if(showNone&&a===optsPerSet)noneCount++;}});
+  });
+  const noneRate=totalAnswers>0?Math.round(noneCount/totalAnswers*100):0;
+
+  // ── Per-respondent dominant profile ──
+  function profileOf(r){
+    let scores={}; // attrIdx -> score (positive = preferred level)
+    cleanAttrs.forEach((a,ai)=>{scores[ai]=0;});
+    (r.answers||[]).forEach((chosen,si)=>{
+      if(si>=design.length||chosen===undefined)return;
+      if(showNone&&chosen===optsPerSet)return;
+      const opt=design[si][chosen];
+      if(!opt)return;
+      cleanAttrs.forEach((a,ai)=>{
+        const li=a.levels.indexOf(opt[ai]);
+        if(li>=0) scores[ai]+=rawUtils[ai][li];
+      });
+    });
+    // Which attr drove choices most strongly?
+    const dominant=Object.entries(scores).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]))[0];
+    const domIdx=parseInt(dominant[0]);
+    const domScore=dominant[1];
+    const weerstand=(r.answers||[]).filter((a,si)=>si<numSets&&showNone&&a===optsPerSet).length>=(numSets/2);
+    if(weerstand)return{label:'Weerstand',cls:'pc-weerstand'};
+    const maxLi=rawUtils[domIdx].indexOf(Math.max(...rawUtils[domIdx]));
+    const chosenUtils=(r.answers||[]).map((a,si)=>{
+      if(si>=design.length||a===undefined||(showNone&&a===optsPerSet))return 0;
+      const opt=design[si][a]; if(!opt)return 0;
+      const li=cleanAttrs[domIdx].levels.indexOf(opt[domIdx]);
+      return li>=0?rawUtils[domIdx][li]:0;
+    });
+    const avgChosen=chosenUtils.reduce((s,v)=>s+v,0)/(chosenUtils.length||1);
+    if(avgChosen>0.1) return{label:cleanAttrs[domIdx].name,cls:['pc-participatie','pc-autonomie','pc-pragmatisch'][domIdx%3]};
+    return{label:'Pragmatisch',cls:'pc-pragmatisch'};
+  }
+
+  // ── Render ──
+  const n=completeData.length;
+  const avgDur=Math.round(completeData.reduce((s,r)=>s+(r.duration_sec||0),0)/n);
+
+  let html=`
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-num">${n}</div><div class="stat-label">Volledige responses</div></div>
+    <div class="stat-card"><div class="stat-num">${avgDur}s</div><div class="stat-label">Gem. invultijd</div></div>
+    <div class="stat-card"><div class="stat-num">${noneRate}%</div><div class="stat-label">"Geen van allen"</div></div>
+  </div>`;
+
+  if(n<5) html+=`<div class="warn-box" style="margin-bottom:1rem">⚠ Let op: met minder dan 5 volledige responses zijn de utilities indicatief, niet statistisch betrouwbaar. Verzamel meer respondenten voor conclusies.</div>`;
+
+  // Relative importance
+  html+=`<div class="card"><div class="card-title">Relatief belang per attribuut</div>
+  <p style="font-size:13px;color:var(--text-2);margin-bottom:1rem">Het percentage geeft aan hoeveel dit kenmerk de keuzes van respondenten heeft beïnvloed. Berekend als: range van utilities / totale range × 100%.</p>`;
+  sortedAttrIdx.forEach(ai=>{
+    html+=`<div class="importance-row">
+      <div class="importance-name">${esc(cleanAttrs[ai].name)}</div>
+      <div class="importance-pct">${importance[ai]}%</div>
+      <div class="imp-bar-bg"><div class="imp-bar-fill" style="width:${importance[ai]}%"></div></div>
+    </div>`;
+  });
+  html+=`</div>`;
+
+  // Part-worth utilities
+  const attrColors=['#2D5F4F','#1a4a7a','#7a3a00','#6a1a6a'];
+  html+=`<div class="card"><div class="card-title">Part-worth utilities per niveau</div>
+  <p style="font-size:13px;color:var(--text-2);margin-bottom:1.25rem">Positieve waarden = aantrekkelijk voor respondenten. Negatieve waarden = weerstand. Utilities zijn gecentreerd: het gemiddelde per attribuut is altijd 0.</p>`;
+
+  sortedAttrIdx.forEach((ai,rank)=>{
+    const u=rawUtils[ai];
+    const maxAbs=Math.max(...u.map(Math.abs),0.001);
+    const col=attrColors[rank%attrColors.length];
+    html+=`<div class="utility-block">
+      <div class="utility-attr-label">${esc(cleanAttrs[ai].name)} <span style="font-weight:400;color:var(--text-3);font-size:11px">(belang: ${importance[ai]}%)</span></div>`;
+    // Sort levels by utility descending
+    const sortedLi=[...u.keys()].sort((a,b)=>u[b]-u[a]);
+    sortedLi.forEach(li=>{
+      const val=u[li];
+      const barW=Math.round(Math.abs(val)/maxAbs*100);
+      const sign=val>=0?'+':'';
+      const barColor=val>=0?col:'#C0392B';
+      html+=`<div class="utility-row-item">
+        <div class="utility-lbl">${esc(cleanAttrs[ai].levels[li])}</div>
+        <div class="utility-bar-wrap">
+          ${val>=0
+            ? `<div class="utility-bar-pos" style="width:${barW}%;background:${barColor}"></div>`
+            : `<div style="margin-left:${100-barW}%;width:${barW}%;height:100%;background:${barColor};border-radius:5px"></div>`}
+        </div>
+        <div class="utility-val" style="color:${barColor}">${sign}${val.toFixed(2)}</div>
+      </div>`;
+    });
+    html+=`</div>`;
+    if(rank<sortedAttrIdx.length-1) html+=`<div style="height:1px;background:var(--border);margin:.75rem 0"></div>`;
+  });
+  html+=`<p style="font-size:12px;color:var(--text-3);margin-top:.75rem">Methode: log-odds op basis van keuzefrequentie per niveau, gecentreerd per attribuut. Voor publiceerbaar onderzoek: gebruik R (mlogit) of Sawtooth Software voor een volledige conditional logit schatting.</p></div>`;
+
+  // Respondent profiles
+  html+=`<div class="card">
+    <div class="card-title" style="display:flex;justify-content:space-between;align-items:center">
+      <span>Individuele keuzeprofielen</span>
+      <button class="btn btn-sm btn-primary" onclick="exportAnalyseCSV()">CSV exporteren</button>
+    </div>
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:1rem">Per respondent: welke keuzes zijn gemaakt en welk attribuut heeft zijn/haar keuze het sterkst bepaald.</p>
+    <div style="overflow-x:auto"><table class="seg-table"><thead><tr>
+      <th>Respondent</th><th>Functie</th><th>${cleanAttrs.map(a=>`<th>${esc(a.name)}<br><span style="font-weight:400;color:var(--text-3)">(gem. utility)</span>`).join('')}</th>
+      <th>Dominant kenmerk</th><th>Tijdstip</th></tr></thead><tbody>`;
+
+  completeData.forEach(r=>{
+    const profile=profileOf(r);
+    const dt=new Date(r.submitted_at);
+    const time=dt.toLocaleDateString('nl-NL',{day:'2-digit',month:'short'})+' '+dt.toLocaleTimeString('nl-NL',{hour:'2-digit',minute:'2-digit'});
+    // Per-attr avg utility for this respondent
+    const perAttr=cleanAttrs.map((a,ai)=>{
+      const vals=(r.answers||[]).map((chosen,si)=>{
+        if(si>=design.length||(showNone&&chosen===optsPerSet))return null;
+        const opt=design[si][chosen]; if(!opt)return null;
+        const li=a.levels.indexOf(opt[ai]);
+        return li>=0?rawUtils[ai][li]:null;
+      }).filter(v=>v!==null);
+      if(!vals.length)return '—';
+      const avg=vals.reduce((s,v)=>s+v,0)/vals.length;
+      return (avg>=0?'+':'')+avg.toFixed(2);
+    });
+    html+=`<tr>
+      <td><div style="display:flex;align-items:center;gap:.6rem">
+        <div class="resp-avatar">${(r.respondent_name||'?').substring(0,2).toUpperCase()}</div>
+        <strong style="font-size:13px">${esc(r.respondent_name||'—')}</strong>
+      </div></td>
+      <td style="color:var(--text-2);font-size:12px">${esc(r.respondent_role||'—')}</td>
+      ${perAttr.map(v=>`<td style="text-align:center;font-weight:500;font-size:13px;color:${v.startsWith('+')?'var(--accent)':v==='—'?'var(--text-3)':'var(--danger)'}">${v}</td>`).join('')}
+      <td><span class="profile-chip ${profile.cls}">${esc(profile.label)}</span></td>
+      <td style="font-size:12px;color:var(--text-3)">${time}</td>
+    </tr>`;
+  });
+  html+=`</tbody></table></div></div>`;
+
+  // Optimal scenario
+  const optimalLevels=cleanAttrs.map((a,ai)=>{
+    const maxLi=rawUtils[ai].indexOf(Math.max(...rawUtils[ai]));
+    return a.levels[maxLi];
+  });
+  const optimalUtil=rawUtils.reduce((s,u)=>s+Math.max(...u),0);
+  html+=`<div class="card"><div class="card-title">Optimaal scenario</div>
+  <p style="font-size:13px;color:var(--text-2);margin-bottom:.875rem">De combinatie van niveaus met de hoogste totale utility — het scenario met theoretisch maximaal draagvlak.</p>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:.875rem">
+    ${cleanAttrs.map((a,ai)=>`<div style="background:var(--accent-light);border:1px solid rgba(45,95,79,.2);border-radius:var(--r);padding:.75rem">
+      <div style="font-size:11px;color:var(--accent);font-weight:600;text-transform:uppercase;letter-spacing:.04em;margin-bottom:.25rem">${esc(a.name)}</div>
+      <div style="font-weight:600;font-size:14px">${esc(optimalLevels[ai])}</div>
+      <div style="font-size:11px;color:var(--accent-mid);margin-top:.15rem">utility: +${rawUtils[ai][cleanAttrs[ai].levels.indexOf(optimalLevels[ai])].toFixed(2)}</div>
+    </div>`).join('')}
+  </div>
+  <div class="info-box">Totale utility van dit scenario: <strong>${optimalUtil.toFixed(2)}</strong>. Let op: het optimale scenario is niet altijd het meest haalbare of goedkoopste. Gebruik deze uitkomst als vertrekpunt voor een scenarioverkenning.</div>
+  </div>`;
+
+  document.getElementById('analyse-content').innerHTML=html;
+}
+
+async function exportAnalyseCSV(){
+  if(!cachedResponseData.length){alert('Geen data.');return;}
+  const cleanAttrs=attrs.map(a=>({...a,levels:a.levels.filter(l=>l.trim())}));
+  const optsPerSet=parseInt(document.getElementById('opts-per-set').value)||3;
+  const showNone=document.getElementById('show-none').value==='1';
+  const numSets=design.length;
+
+  // Recompute utilities
+  const freq={};
+  cleanAttrs.forEach((a,ai)=>a.levels.forEach((_,li)=>{freq[ai+'-'+li]={chosen:0,total:0};}));
+  cachedResponseData.filter(r=>(r.answers||[]).length>=numSets).forEach(r=>{
+    (r.answers||[]).forEach((chosen,si)=>{
+      if(si>=design.length)return;
+      const isNone=showNone&&chosen===optsPerSet;
+      design[si].forEach((opt,oi)=>{
+        cleanAttrs.forEach((a,ai)=>{
+          const li=a.levels.indexOf(opt[ai]);if(li<0)return;
+          freq[ai+'-'+li].total++;
+          if(!isNone&&oi===chosen)freq[ai+'-'+li].chosen++;
+        });
+      });
+    });
+  });
+  const rawUtils=cleanAttrs.map((a,ai)=>{
+    const u=a.levels.map((_,li)=>{const d=freq[ai+'-'+li];if(!d||d.total===0)return 0;const p=Math.min(.99,Math.max(.01,d.chosen/d.total));return Math.log(p/(1-p));});
+    const mean=u.reduce((s,v)=>s+v,0)/u.length;
+    return u.map(v=>v-mean);
+  });
+
+  let rows=[['Respondent','Functie',...cleanAttrs.map(a=>a.name+'_gem_utility'),'Tijdstip']];
+  cachedResponseData.forEach(r=>{
+    const perAttr=cleanAttrs.map((a,ai)=>{
+      const vals=(r.answers||[]).map((chosen,si)=>{
+        if(si>=design.length||(showNone&&chosen===optsPerSet))return null;
+        const opt=design[si][chosen];if(!opt)return null;
+        const li=a.levels.indexOf(opt[ai]);return li>=0?rawUtils[ai][li]:null;
+      }).filter(v=>v!==null);
+      return vals.length?+(vals.reduce((s,v)=>s+v,0)/vals.length).toFixed(3):'';
+    });
+    rows.push([r.respondent_name,r.respondent_role||'',...perAttr,r.submitted_at]);
+  });
+  const bom='﻿';
+  const csv=bom+rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(';')).join('
+');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download='cbc-analyse.csv';a.click();
 }
 
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
