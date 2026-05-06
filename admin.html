@@ -372,20 +372,25 @@ function doLogin(){
   initApp();
 }
 
+// ─── Safe localStorage wrapper (Edge Tracking Prevention safe) ────────
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
 // ─── App init ─────────────────────────────────────────────────────────
 function initApp(){
   document.getElementById('app-shell').style.display = 'grid';
-  // Init Supabase
-  const url = localStorage.getItem('sb_url') || (typeof CBC_CONFIG!=='undefined'?CBC_CONFIG.supabaseUrl:'');
-  const key = localStorage.getItem('sb_key') || (typeof CBC_CONFIG!=='undefined'?CBC_CONFIG.supabaseKey:'');
-  if(url && key){
+  // Prefer config.js values (most reliable), fall back to localStorage
+  const cfgOk = typeof CBC_CONFIG !== 'undefined' && CBC_CONFIG.supabaseUrl && !CBC_CONFIG.supabaseUrl.includes('PLAK_HIER');
+  const url = cfgOk ? CBC_CONFIG.supabaseUrl : (lsGet('sb_url')||'');
+  const key = cfgOk ? CBC_CONFIG.supabaseKey : (lsGet('sb_key')||'');
+  if(url && key && !url.includes('PLAK_HIER')){
     supabaseClient = supabase.createClient(url, key);
     document.getElementById('sb-status').textContent = '● Verbonden';
   } else {
     showConfigModal();
   }
   // Load saved study from localStorage
-  const saved = localStorage.getItem('cbc_study');
+  const saved = lsGet('cbc_study');
   if(saved){
     try{
       const d = JSON.parse(saved);
@@ -448,8 +453,8 @@ async function saveConfig(){
       errEl.style.display='block'; return;
     }
     // Success — save and init client
-    localStorage.setItem('sb_url', url);
-    localStorage.setItem('sb_key', key);
+    lsSet('sb_url', url);
+    lsSet('sb_key', key);
     supabaseClient = supabase.createClient(url, key);
     document.getElementById('config-modal').style.display='none';
     document.getElementById('sb-status').textContent='● Verbonden';
@@ -644,8 +649,8 @@ function copyLink(){
 }
 
 function updateConfigPreview(){
-  const url=localStorage.getItem('sb_url')||'';
-  const key=localStorage.getItem('sb_key')||'';
+  const url=lsGet('sb_url')||'';
+  const key=lsGet('sb_key')||'';
   const adminCode=(typeof CBC_CONFIG!=='undefined'&&CBC_CONFIG.adminCode)?CBC_CONFIG.adminCode:ADMIN_CODE;
   const preview=`// config.js — Voeg dit bestand toe aan je GitHub repository
 const CBC_CONFIG = {
@@ -658,8 +663,8 @@ const CBC_CONFIG = {
 }
 
 function downloadConfigJS(){
-  const url=localStorage.getItem('sb_url')||'';
-  const key=localStorage.getItem('sb_key')||'';
+  const url=lsGet('sb_url')||'';
+  const key=lsGet('sb_key')||'';
   const adminCode=(typeof CBC_CONFIG!=='undefined'&&CBC_CONFIG.adminCode)?CBC_CONFIG.adminCode:ADMIN_CODE;
   const content=`// config.js — Voeg dit bestand toe aan je GitHub repository\nconst CBC_CONFIG = {\n  supabaseUrl: "${url}",\n  supabaseKey: "${key}",\n  adminCode: "${adminCode}"\n};`;
   const a=document.createElement('a');
@@ -752,7 +757,7 @@ async function exportCSV(){
 
 // ─── Local save ───────────────────────────────────────────────────────
 function saveLocal(){
-  localStorage.setItem('cbc_study',JSON.stringify({
+  lsSet('cbc_study',JSON.stringify({
     title:document.getElementById('study-title').value,
     author:document.getElementById('study-author').value,
     desc:document.getElementById('study-desc').value,
@@ -1035,9 +1040,8 @@ async function exportAnalyseCSV(){
     });
     rows.push([r.respondent_name,r.respondent_role||'',...perAttr,r.submitted_at]);
   });
-  const bom='﻿';
-  const csv=bom+rows.map(r=>r.map(v=>`"${String(v||'').replace(/"/g,'""')}"`).join(';')).join('
-');
+  const bom='\uFEFF';
+  const csv=bom+rows.map(r=>r.map(v=>'"'+String(v||'').replace(/"/g,'""')+'"').join(';')).join('\n');
   const a=document.createElement('a');
   a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
   a.download='cbc-analyse.csv';a.click();
